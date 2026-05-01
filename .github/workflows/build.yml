@@ -1,14 +1,23 @@
 name: Build
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       tag_name:
-        description: "Tag name"
+        description: "Tag name for PoC"
         required: true
         type: string
       should_upload_artifacts:
         description: "Should upload artifacts"
+        required: false
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      tag_name:
+        required: true
+        type: string
+      should_upload_artifacts:
         required: false
         type: boolean
         default: false
@@ -16,81 +25,19 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - name: x86_64-unknown-linux-gnu
-            os: ubuntu-22.04
-            path: target/x86_64-unknown-linux-gnu/release/function-runner
-            asset_name: function-runner-x86_64-linux-${{ inputs.tag_name }}
-            shasum_cmd: sha256sum
-          - name: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04
-            path: target/aarch64-unknown-linux-gnu/release/function-runner
-            asset_name: function-runner-arm-linux-${{ inputs.tag_name }}
-            shasum_cmd: sha256sum
-          - name: x86_64-apple-darwin
-            os: macos-latest
-            path: target/x86_64-apple-darwin/release/function-runner
-            asset_name: function-runner-x86_64-macos-${{ inputs.tag_name }}
-            shasum_cmd: shasum -a 256
-          - name: aarch64-apple-darwin
-            os: macos-latest
-            path: target/aarch64-apple-darwin/release/function-runner
-            asset_name: function-runner-arm-macos-${{ inputs.tag_name }}
-            shasum_cmd: shasum -a 256
-          - name: x86_64-pc-windows-msvc
-            os: windows-latest
-            path: target\x86_64-pc-windows-msvc\release\function-runner.exe
-            asset_name: function-runner-x86_64-windows-${{ inputs.tag_name }}
-            shasum_cmd: sha256sum
-          - name: aarch64-pc-windows-msvc
-            os: windows-latest
-            path: target\aarch64-pc-windows-msvc\release\function-runner.exe
-            asset_name: function-runner-arm-windows-${{ inputs.tag_name }}
-            shasum_cmd: sha256sum
+            path: README.md # Dùng file tạm để test cho nhanh
+            asset_name: "test-${{ inputs.tag_name }}"
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@v4
 
-      - name: Install cross compiler
-        if: ${{ matrix.name == 'aarch64-unknown-linux-gnu' }}
+      - name: Archive assets (Vulnerable Step)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Set up cross compiler env variables
-        if: ${{ matrix.name == 'aarch64-unknown-linux-gnu' }}
-        run: |
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
-
-      - name: Install target
-        run: rustup target add ${{ matrix.name }}
-
-      - name: Build ${{ matrix.name }}
-        run: cargo build --release --target ${{ matrix.name }} --package function-runner
-
-      - name: Archive assets
-        if: ${{ inputs.should_upload_artifacts }}
-        run: gzip -k -f ${{ matrix.path }} && mv ${{ matrix.path }}.gz ${{ matrix.asset_name }}.gz
-
-      - name: Upload assets to artifacts
-        if: ${{ inputs.should_upload_artifacts }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: ${{ matrix.asset_name }}.gz
-          path: ${{ matrix.asset_name }}.gz
-
-      - name: Generate asset hash
-        if: ${{ inputs.should_upload_artifacts }}
-        run: ${{ matrix.shasum_cmd }} ${{ matrix.asset_name }}.gz | awk '{ print $1 }' > ${{ matrix.asset_name }}.gz.sha256
-
-      - name: Upload asset hash to artifacts
-        if: ${{ inputs.should_upload_artifacts }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: ${{ matrix.asset_name }}.gz.sha256
-          path: ${{ matrix.asset_name }}.gz.sha256
+          # Đây là nơi lỗ hổng xảy ra do thiếu dấu ngoặc kép quanh ${{ matrix.asset_name }}
+          echo "Testing injection..."
+          gzip -c ${{ matrix.path }} > test.gz && mv test.gz ${{ matrix.asset_name }}.gz
