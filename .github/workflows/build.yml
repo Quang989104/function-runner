@@ -7,20 +7,11 @@ on:
         description: "Tag name for PoC"
         required: true
         type: string
-      should_upload_artifacts:
-        description: "Should upload artifacts"
-        required: false
-        type: boolean
-        default: true
   workflow_call:
     inputs:
       tag_name:
         required: true
         type: string
-      should_upload_artifacts:
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   build:
@@ -30,14 +21,18 @@ jobs:
       matrix:
         include:
           - name: x86_64-unknown-linux-gnu
-            path: README.md # Dùng file tạm để test cho nhanh
-            asset_name: "test-${{ inputs.tag_name }}"
+            path: README.md
+            # Bỏ dấu ngoặc kép bao quanh để tránh lỗi YAML mapping
+            asset_name: test-output
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Archive assets (Vulnerable Step)
         run: |
-          # Đây là nơi lỗ hổng xảy ra do thiếu dấu ngoặc kép quanh ${{ matrix.asset_name }}
-          echo "Testing injection..."
-          gzip -c ${{ matrix.path }} > test.gz && mv test.gz ${{ matrix.asset_name }}.gz
+          # Dùng trực tiếp input vào shell để chứng minh RCE nhanh nhất
+          TAG_NAME="${{ github.event.inputs.tag_name }}"
+          echo "Debug: Tag name is $TAG_NAME"
+          
+          # Lệnh gốc bị lỗi injection (không có dấu ngoặc kép bao quanh biến)
+          gzip -c ${{ matrix.path }} > test.gz && mv test.gz function-runner-$TAG_NAME.gz
